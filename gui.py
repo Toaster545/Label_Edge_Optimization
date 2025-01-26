@@ -5,17 +5,19 @@ from algos import solve
 def createGui(po_df, inv_df):
 # create the gui for the application start
 
-    selected_items = []
+    sg.theme('DarkBlue3')
+    
+    selected_orders = []
     po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
     
     layout = [
-    [sg.Text("Select an option from the dropdown:")],
-    [sg.Combo(po_list, key='-DROPDOWN-',default_value=po_list[0], enable_events=True)],
+    [sg.Text("Select all wanted orders from the dropown")],
+    [sg.Combo(po_list, key='-DROPDOWN-', default_value = po_list[0], enable_events=True)],
     [sg.Button("Add")], 
-    [sg.Listbox(values=selected_items, size=(30, 6), key='-LISTBOX-')],
-    [sg.Button("Submit"), sg.Button("Exit")]
+    [sg.Listbox(values=selected_orders, size=(50, 10), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
+    [sg.Button("Remove"), sg.Button("Submit"), sg.Button("Exit")]
 ]
-    window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600))
+    window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
 
     while True:
         event, values = window.read()
@@ -24,11 +26,27 @@ def createGui(po_df, inv_df):
             break
         
         if event == 'Add':
-            selected_option = values['-DROPDOWN-']  # Get selected dropdown value
-            if selected_option not in selected_items:
-                selected_items.append(selected_option)  # Add to the list
-                window['-LISTBOX-'].update(selected_items)  # Update the Listbox
+            addOrder(window, values['-DROPDOWN-'], selected_orders)
+            
+        if event == 'Remove':
+            removeOrder(window, values['-CHOSEN-'], selected_orders)
         
         if event == "Submit":
             value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_items)
+                
     window.close()
+  
+# Add order from dropdown to list box  
+def addOrder(window, selected_option, selected_orders):
+    if selected_option not in selected_orders:
+        selected_orders.append(selected_option)
+        window['-CHOSEN-'].update(selected_orders)
+        
+        
+# Remove selected orders from list box  
+def removeOrder(window, items_to_delete, selected_orders):
+    if items_to_delete:  # Check if an item is selected
+        for item in items_to_delete:
+            if item in selected_orders:
+                selected_orders.remove(item)  # Remove the item from the list
+        window['-CHOSEN-'].update(selected_orders)
