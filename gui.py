@@ -4,11 +4,13 @@ import sys
 def createGui(po_df):
 # create the gui for the application start
 
+    sg.theme('DarkBlue3')
+    
     selected_orders = []
     po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
     
     layout = [
-    [sg.Text("Select an option from the dropdown:")],
+    [sg.Text("Select all wanted orders from the dropown")],
     [sg.Combo(po_list, key='-DROPDOWN-', default_value = po_list[0], enable_events=True)],
     [sg.Button("Add")], 
     [sg.Listbox(values=selected_orders, size=(50, 10), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
