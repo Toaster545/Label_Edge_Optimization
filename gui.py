@@ -1,6 +1,6 @@
 # import PySimpleGUI as sg
 
-from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel
+from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QVBoxLayout, QComboBox
 import sys
 
 def createGui(po_df):
@@ -10,13 +10,42 @@ def createGui(po_df):
     class MainWindow(QMainWindow):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("Start app")
+            self.setWindowTitle("LabelEdge Optimisor")
             self.setGeometry(100, 100, 600, 400)  # Set x, y, width, height
             self.initUI()
 
         def initUI(self):
-            label = QLabel("Hello, PyQt6!", self)  # Add a label to the window
-            label.move(50, 50)  # Position the label at x=50, y=50
+            self.setWindowTitle("Dropdown Menu Example")
+            self.setGeometry(100, 100, 300, 200)
+
+            # Create a layout
+            layout = QVBoxLayout()
+
+            # Create a label to display the selected option
+            self.label = QLabel("Select an option", self)
+
+            # Create a combo box (dropdown)
+            self.combo_box = QComboBox(self)
+            
+            # Add items to the combo box
+            self.combo_box.addItem("Option 1")
+            self.combo_box.addItem("Option 2")
+            self.combo_box.addItem("Option 3")
+            self.combo_box.addItem("Option 4")
+            
+            # Connect the signal to handle the selection change
+            self.combo_box.currentTextChanged.connect(self.on_item_selected)
+
+            # Add the combo box and label to the layout
+            layout.addWidget(self.combo_box)
+            layout.addWidget(self.label)
+
+            # Set the layout for the main window
+            self.setLayout(layout)
+
+        def on_item_selected(self, text):
+            # Update the label when an item is selected
+            self.label.setText(f"Selected: {text}")  # Add a label to the window
 
     # Step 2: Create the Application Instance
     app = QApplication(sys.argv)  # QApplication requires a list of command-line arguments
