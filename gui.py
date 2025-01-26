@@ -26,6 +26,7 @@ def createGui(po_df):
         if event == 'Add':
             selected_option = values['-DROPDOWN-']  # Get selected dropdown value
             if selected_option not in selected_items:
-                selected_items.append(selected_option)  # Add to the list
+                selected_items.append(selected_option)
+                listbox_height = len(selected_items)
                 window['-LISTBOX-'].update(selected_items)  # Update the Listbox
     window.close()
