@@ -52,11 +52,12 @@ def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
     return df
 
 def filter_po_df(df, start_row):
+    df = df.loc[df['Active/Inactive'] == 'A']
     po_df = df.loc[df['No'] >=start_row]
     po_df = po_df[po_df["Vendu à"].notna()]
     
     start_column = "Code Prix 1"
-    named_columns = ["No", "Vendu à"]
+    named_columns = ["No", "Vendu à", "No Commande"]
     start_index = po_df.columns.get_loc(start_column)
     columns_to_keep = named_columns + list(po_df.columns[start_index:])
     po_df = po_df[columns_to_keep]
