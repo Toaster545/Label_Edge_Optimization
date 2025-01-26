@@ -1,7 +1,8 @@
 import PySimpleGUI as sg
 import sys
+from algos import solve
 
-def createGui(po_df):
+def createGui(po_df, inv_df):
 # create the gui for the application start
 
     sg.theme('DarkBlue3')
@@ -14,7 +15,7 @@ def createGui(po_df):
     [sg.Combo(po_list, key='-DROPDOWN-', default_value = po_list[0], enable_events=True)],
     [sg.Button("Add")], 
     [sg.Listbox(values=selected_orders, size=(50, 10), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
-    [sg.Button("Remove"), sg.Button("Exit")]
+    [sg.Button("Remove"), sg.Button("Submit"), sg.Button("Exit")]
 ]
     window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
 
@@ -29,6 +30,9 @@ def createGui(po_df):
             
         if event == 'Remove':
             removeOrder(window, values['-CHOSEN-'], selected_orders)
+        
+        if event == "Submit":
+            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_items)
                 
     window.close()
   
