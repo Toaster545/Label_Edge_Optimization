@@ -1,25 +1,11 @@
 from fileInput import xlsm_to_dataframe, filter_inv_df, process_groups, filter_po_df
+from gui import createGui
 import warnings
 import tkinter as tk
-import PySimpleGUI as sg
-
-
 
 def main():
     
-    layout = [[sg.Text("Hello, World!")], [sg.Button("OK")]]
-    window = sg.Window("Simple App", layout, size=(800, 600))
 
-    while True:
-        event, values = window.read()
-        
-        if event == sg.WINDOW_CLOSED or event == "OK":
-            break
-    
-    
-
-    window.close()
-    
     # Loading files
     xlsm_file = "data/Inventaire_2025.xlsx"
     sheet_name = "Papier"
@@ -37,6 +23,7 @@ def main():
     
     print(po_df)
     
+    createGui(po_df)
     
     
     #code_values = inv_df["Code LabelEdge"].unique()
