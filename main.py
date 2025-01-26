@@ -1,7 +1,24 @@
 from fileInput import xlsm_to_dataframe, filter_inv_df, process_groups, filter_po_df
 import warnings
+import tkinter as tk
+import PySimpleGUI as sg
+
+
 
 def main():
+    
+    layout = [[sg.Text("Hello, World!")], [sg.Button("OK")]]
+    window = sg.Window("Simple App", layout, size=(800, 600))
+
+    while True:
+        event, values = window.read()
+        
+        if event == sg.WINDOW_CLOSED or event == "OK":
+            break
+    
+    
+
+    window.close()
     
     # Loading files
     xlsm_file = "data/Inventaire_2025.xlsx"
@@ -11,7 +28,7 @@ def main():
     
     label_code = "S21-1"
     inv_df = filter_inv_df(inv_df, label_code)
-    print(inv_df)
+    #print(inv_df)
     
     xlsm_file = "data/Commande_Client.xlsm"
     sheet_name = "PO Client"
@@ -19,6 +36,13 @@ def main():
     po_df = filter_po_df(po_df, 305)
     
     print(po_df)
+    
+    
+    
+    #code_values = inv_df["Code LabelEdge"].unique()
+    # Print the unique values
+    #print("Unique code values in 'Code LabelEdge':")
+    #print(code_values)
     
 
 if __name__ == "__main__":

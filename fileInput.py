@@ -41,12 +41,12 @@ def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
     code_values = df["Code LabelEdge"].unique()
 
     # Print the unique values
-    print("Unique code values in 'Code LabelEdge':")
-    print(code_values)
+    #print("Unique code values in 'Code LabelEdge':")
+    #print(code_values)
     
     # Filtering 
     #df = df.loc[df["Code LabelEdge"] == label_code]
-    df = df[["Larg.", "Longueur"]]
+    df = df[["Code LabelEdge", "Larg.", "Longueur"]]
     
     df = df.reset_index(drop=True)
     return df
@@ -56,7 +56,7 @@ def filter_po_df(df, start_row):
     po_df = po_df[po_df["Vendu à"].notna()]
     
     start_column = "Code Prix 1"
-    named_columns = ["No"]
+    named_columns = ["No", "Vendu à"]
     start_index = po_df.columns.get_loc(start_column)
     columns_to_keep = named_columns + list(po_df.columns[start_index:])
     po_df = po_df[columns_to_keep]
