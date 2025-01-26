@@ -1,16 +1,15 @@
 import PySimpleGUI as sg
-
-from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QVBoxLayout, QComboBox
 import sys
 
 def createGui(po_df):
 # create the gui for the application start
 
     selected_items = []
+    po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
     
     layout = [
     [sg.Text("Select an option from the dropdown:")],
-    [sg.Combo(['Option 1', 'Option 2', 'Option 3'], default_value='Option 1', key='-DROPDOWN-', enable_events=True)],
+    [sg.Combo(po_list, key='-DROPDOWN-', enable_events=True)],
     [sg.Button("Add")], 
     [sg.Listbox(values=selected_items, size=(30, 6), key='-LISTBOX-')],
     [sg.Button("Exit")]
