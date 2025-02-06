@@ -10,12 +10,9 @@ def createGui(po_df):
     po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
     
     layout = [
-    [sg.Text("Select all wanted orders from the dropown")],
-    [sg.Combo(po_list, key='-DROPDOWN-', default_value = po_list[0], enable_events=True)],
-    [sg.Button("Add")], 
-    [sg.Listbox(values=selected_orders, size=(50, 10), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
-    [sg.Button("Remove"), sg.Button("Exit")]
-]
+    [sg.Button("Choose Orders", button_color=("white", "black"), size=(15, 2), border_width=10)]
+    ]
+    
     window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
 
     while True:
@@ -24,6 +21,13 @@ def createGui(po_df):
         if event == sg.WINDOW_CLOSED or event == "Exit":
             break
         
+        if event == 'Choose Orders':
+            layout = openOrders(po_list)
+            window.close()
+            window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
+            event, values = window.read()
+            
+        # useless functions for now
         if event == 'Add':
             addOrder(window, values['-DROPDOWN-'], selected_orders)
             
@@ -31,7 +35,47 @@ def createGui(po_df):
             removeOrder(window, values['-CHOSEN-'], selected_orders)
                 
     window.close()
-  
+
+
+# Creat a window to selct orders from checkbox
+def openOrders(po_list):
+    
+    # setup the layout of the order window
+    new_layout = [
+    [sg.Text("Check all wanted orders", font=("Arial", 14, "bold"))],
+    [sg.Checkbox(po_list, key=f"-ORDER_{i}-") for i, task in enumerate(po_list)],
+    [sg.Button("Submit")]
+    ]
+    
+    new_window = sg.Window("Order Selector", new_layout, size=(800, 600), resizable=True)
+    
+    # loop to keep the order window open
+    while True:
+        event, values = new_window.read()
+        
+        if event == sg.WINDOW_CLOSED:
+            break
+        
+        if event == 'Submit':
+            checked_orders = [po_list[i] for i in range(len(po_list)) if values[f"-ORDER_{i}-"]]
+            layout = updateBase(checked_orders)
+            break
+        
+    new_window.close()
+    
+    return layout 
+            
+# Update the base with the selected orders
+def updateBase(checked_orders):
+    layout = [
+    [sg.Text("All orders to be processed")], 
+    [sg.Listbox(values=checked_orders, size=(50, len(checked_orders)), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
+    [sg.Button("Remove"), sg.Button("Exit")]
+    ]
+    
+    return layout
+    
+
 # Add order from dropdown to list box  
 def addOrder(window, selected_option, selected_orders):
     if selected_option not in selected_orders:
