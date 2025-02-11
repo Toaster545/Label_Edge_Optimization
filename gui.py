@@ -43,6 +43,8 @@ def createGui(po_df, inv_df):
             
             papers = inv_df['Code LabelEdge'].unique()
             selected_paper_key = next((key for key, val in values.items() if key.startswith("-PAPER_") and val), None)
+            util_tol = float(values["-INPUT1-"])
+            rem_tol = float(values["-INPUT2-"])
 
             # Extract the actual paper value using the index
             if selected_paper_key:
@@ -52,7 +54,9 @@ def createGui(po_df, inv_df):
             value = solve(inv_df=inv_df, 
                           po_df=po_df ,
                           selected_pos=[products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]], 
-                          label_code=selected_paper_value
+                          label_code=selected_paper_value,
+                          util_tol=util_tol, 
+                          rem_tol=rem_tol
                           )
                 
     window.close()
@@ -104,6 +108,10 @@ def updateBase(inv_df, products):
                 [[sg.Radio(task, "PAPER_GROUP", key=f"-PAPER_{i}-")] for i, task in enumerate(papers)], 
                 size=(200, 300), scrollable=True, vertical_scroll_only=True
             )
+        ],
+        [
+        sg.Text("Percentage of \"Full\" master roll:"), sg.InputText(default_text="0.8", key="-INPUT1-", size=(10, 1)),
+        sg.Text("Max Removal Percentage :"), sg.InputText(default_text="0.1", key="-INPUT2-", size=(10, 1))
         ],
         [sg.Button("Remove"), sg.Button("Submit"), sg.Button("Exit")]
     ]
