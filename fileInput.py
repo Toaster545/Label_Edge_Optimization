@@ -31,7 +31,7 @@ def xlsm_to_dataframe(xlsm_file, sheet_name, start_row=3):
         return None
     
 def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
-    df = df.loc[df['Actif / Inactif'] == actIna]
+    #df = df.loc[df['Actif / Inactif'] == actIna]
     df = df.sort_values(by=orderBy, ascending=True)
     df = df.reset_index(drop=True)
     df = convert_units(df)
