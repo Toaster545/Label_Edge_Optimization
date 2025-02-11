@@ -1,6 +1,7 @@
 import PySimpleGUI as sg
 import sys
-from algos import solve
+from algos import solve, createProductBlocks
+from fileInput import extract_valid_products
 
 def createGui(po_df, inv_df):
 # create the gui for the application start
@@ -23,7 +24,7 @@ def createGui(po_df, inv_df):
             break
         
         if event == 'Choose Orders':
-            layout = openOrders(po_list)
+            layout = openOrders(po_df, po_list)
             window.close()
             window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
             event, values = window.read()
@@ -36,19 +37,21 @@ def createGui(po_df, inv_df):
             removeOrder(window, values['-CHOSEN-'], selected_orders)
         
         if event == "Submit":
-            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_items)
+            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_orders)
                 
     window.close()
 
 
 # Creat a window to selct orders from checkbox
-def openOrders(po_list):
+def openOrders(po_df, po_list):
+    
+    print(po_list)
     
     # setup the layout of the order window
     new_layout = [
-    [sg.Text("Check all wanted orders", font=("Arial", 14, "bold"))],
-    [sg.Checkbox(po_list, key=f"-ORDER_{i}-") for i, task in enumerate(po_list)],
-    [sg.Button("Submit")]
+        [sg.Text("Check all wanted orders", font=("Arial", 14, "bold"))],
+        *[[sg.Checkbox(task, key=f"-ORDER_{i}-")] for i, task in enumerate(po_list)],  # Each checkbox is in its own list
+        [sg.Button("Submit")]
     ]
     
     new_window = sg.Window("Order Selector", new_layout, size=(800, 600), resizable=True)
@@ -62,7 +65,7 @@ def openOrders(po_list):
         
         if event == 'Submit':
             checked_orders = [po_list[i] for i in range(len(po_list)) if values[f"-ORDER_{i}-"]]
-            layout = updateBase(checked_orders)
+            layout = updateBase(checked_orders, po_df)
             break
         
     new_window.close()
@@ -70,10 +73,12 @@ def openOrders(po_list):
     return layout 
             
 # Update the base with the selected orders
-def updateBase(checked_orders):
+def updateBase(checked_orders, df):
+    
+    products = createProductBlocks(df, checked_orders)
     layout = [
     [sg.Text("All orders to be processed")], 
-    [sg.Listbox(values=checked_orders, size=(50, len(checked_orders)), key='-CHOSEN-', select_mode='multiple', enable_events=True)],
+    *[[sg.Checkbox(task, key=f"-ORDER_{i}-")] for i, task in enumerate(products)],
     [sg.Button("Remove"), sg.Button("Exit")]
     ]
     
