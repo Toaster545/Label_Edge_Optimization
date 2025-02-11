@@ -1,5 +1,6 @@
 def createProductBlocks(po_df, selected_pos):
     
+    print(selected_pos)
     numbers = []
     for p in selected_pos:
         p = p.split(' ')[0]

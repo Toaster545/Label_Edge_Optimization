@@ -1,7 +1,6 @@
 import PySimpleGUI as sg
 import sys
 from algos import solve, createProductBlocks
-from fileInput import extract_valid_products
 
 def createGui(po_df, inv_df):
 # create the gui for the application start
@@ -9,10 +8,11 @@ def createGui(po_df, inv_df):
     sg.theme('DarkBlue3')
     
     selected_orders = []
+    products = []
     po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
     
     layout = [
-    [sg.Button("Choose Orders", button_color=("white", "black"), size=(15, 2), border_width=10)]
+    [sg.Button("Choose Orders", button_color=("black", "white"), size=(15, 2), border_width=10)]
     ]
     
     window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
@@ -24,7 +24,9 @@ def createGui(po_df, inv_df):
             break
         
         if event == 'Choose Orders':
-            layout = openOrders(po_df, po_list)
+            temp = openOrders(po_df, po_list)
+            layout = temp[0]
+            products = temp[1]
             window.close()
             window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
             event, values = window.read()
@@ -37,7 +39,7 @@ def createGui(po_df, inv_df):
             removeOrder(window, values['-CHOSEN-'], selected_orders)
         
         if event == "Submit":
-            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_orders)
+            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=[products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]])
                 
     window.close()
 
@@ -54,36 +56,42 @@ def openOrders(po_df, po_list):
         [sg.Button("Submit")]
     ]
     
-    new_window = sg.Window("Order Selector", new_layout, size=(800, 600), resizable=True)
+    new_window = sg.Window("Order Selector", new_layout, size=(500, 500), resizable=True)
     
     # loop to keep the order window open
     while True:
         event, values = new_window.read()
         
-        if event == sg.WINDOW_CLOSED:
+        if event == sg.WINDOW_CLOSED or event == "Exit":
             break
         
         if event == 'Submit':
             checked_orders = [po_list[i] for i in range(len(po_list)) if values[f"-ORDER_{i}-"]]
-            layout = updateBase(checked_orders, po_df)
+            products = createProductBlocks(po_df, checked_orders)
+            print(products)
+            layout = updateBase(products)
             break
         
     new_window.close()
     
-    return layout 
+    return [layout, products]
             
 # Update the base with the selected orders
-def updateBase(checked_orders, df):
+def updateBase(products):
     
-    products = createProductBlocks(df, checked_orders)
     layout = [
     [sg.Text("All orders to be processed")], 
-    *[[sg.Checkbox(task, key=f"-ORDER_{i}-")] for i, task in enumerate(products)],
-    [sg.Button("Remove"), sg.Button("Exit")]
+    *[[sg.Checkbox(task, key=f"-PROD_{i}-")] for i, task in enumerate(products)],
+    [sg.Button("Remove"),sg.Button("Submit"), sg.Button("Exit")]
     ]
     
     return layout
     
+def selectProducts(products, values):
+    checked_products = [products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]]
+
+    return checked_products
+                
 
 # Add order from dropdown to list box  
 def addOrder(window, selected_option, selected_orders):
