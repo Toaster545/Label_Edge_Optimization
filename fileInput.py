@@ -1,6 +1,4 @@
 import pandas as pd
-import warnings
-import openpyxl
 
 
 def xlsm_to_dataframe(xlsm_file, sheet_name, start_row=3):
@@ -147,4 +145,3 @@ def process_groups(df, start_column):
     )
 
     return processed_df
-
