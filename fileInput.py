@@ -44,7 +44,7 @@ def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
     
     # Filtering 
     #df = df.loc[df["Code LabelEdge"] == label_code]
-    df = df[["Code LabelEdge", "Larg.", "Longueur"]]
+    df = df[["Code achat", "Code LabelEdge", "Larg.", "Longueur"]]
     
     df = df.reset_index(drop=True)
     return df

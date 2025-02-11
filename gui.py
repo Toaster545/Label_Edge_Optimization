@@ -15,6 +15,7 @@ def createGui(po_df, inv_df):
     [sg.Button("Choose Orders", button_color=("black", "white"), size=(15, 2), border_width=10)]
     ]
     
+    
     window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
 
     while True:
@@ -24,7 +25,7 @@ def createGui(po_df, inv_df):
             break
         
         if event == 'Choose Orders':
-            temp = openOrders(po_df, po_list)
+            temp = openOrders(inv_df, po_df, po_list)
             layout = temp[0]
             products = temp[1]
             window.close()
@@ -39,15 +40,26 @@ def createGui(po_df, inv_df):
             removeOrder(window, values['-CHOSEN-'], selected_orders)
         
         if event == "Submit":
-            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=[products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]])
+            
+            papers = inv_df['Code LabelEdge'].unique()
+            selected_paper_key = next((key for key, val in values.items() if key.startswith("-PAPER_") and val), None)
+
+            # Extract the actual paper value using the index
+            if selected_paper_key:
+                selected_index = int(selected_paper_key.replace("-PAPER_", "").replace("-", ""))
+                selected_paper_value = papers[selected_index]
+            
+            value = solve(inv_df=inv_df, 
+                          po_df=po_df ,
+                          selected_pos=[products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]], 
+                          label_code=selected_paper_value
+                          )
                 
     window.close()
 
 
 # Creat a window to selct orders from checkbox
-def openOrders(po_df, po_list):
-    
-    print(po_list)
+def openOrders(inv_df, po_df, po_list):
     
     # setup the layout of the order window
     new_layout = [
@@ -56,7 +68,7 @@ def openOrders(po_df, po_list):
         [sg.Button("Submit")]
     ]
     
-    new_window = sg.Window("Order Selector", new_layout, size=(500, 500), resizable=True)
+    new_window = sg.Window("Order Selector", new_layout, size=(800, 600), resizable=True)
     
     # loop to keep the order window open
     while True:
@@ -68,8 +80,7 @@ def openOrders(po_df, po_list):
         if event == 'Submit':
             checked_orders = [po_list[i] for i in range(len(po_list)) if values[f"-ORDER_{i}-"]]
             products = createProductBlocks(po_df, checked_orders)
-            print(products)
-            layout = updateBase(products)
+            layout = updateBase(inv_df, products)
             break
         
     new_window.close()
@@ -77,12 +88,24 @@ def openOrders(po_df, po_list):
     return [layout, products]
             
 # Update the base with the selected orders
-def updateBase(products):
+def updateBase(inv_df, products):
+    papers = inv_df['Code LabelEdge'].unique()
+    papers = sorted(inv_df['Code LabelEdge'].dropna().unique())
     
     layout = [
-    [sg.Text("All orders to be processed")], 
-    *[[sg.Checkbox(task, key=f"-PROD_{i}-")] for i, task in enumerate(products)],
-    [sg.Button("Remove"),sg.Button("Submit"), sg.Button("Exit")]
+        [sg.Text("All orders to be processed")],
+        [
+            sg.Column(
+                [[sg.Checkbox(task, key=f"-PROD_{i}-")] for i, task in enumerate(products)], 
+                size=(200, 300), scrollable=True, vertical_scroll_only=True
+            ),
+            sg.VSeparator(),
+            sg.Column(
+                [[sg.Radio(task, "PAPER_GROUP", key=f"-PAPER_{i}-")] for i, task in enumerate(papers)], 
+                size=(200, 300), scrollable=True, vertical_scroll_only=True
+            )
+        ],
+        [sg.Button("Remove"), sg.Button("Submit"), sg.Button("Exit")]
     ]
     
     return layout
