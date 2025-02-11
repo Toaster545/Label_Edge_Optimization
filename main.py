@@ -21,7 +21,7 @@ def main():
     po_df = xlsm_to_dataframe(xlsm_file=xlsm_file, sheet_name=sheet_name, start_row=1)
     po_df = filter_po_df(po_df, 305)
     
-    #print(po_df)
+    # print(po_df)
     
     createGui(po_df, inv_df)
     
