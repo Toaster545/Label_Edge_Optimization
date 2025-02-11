@@ -1,4 +1,4 @@
-def create_product_blocks(po_df, selected_pos):
+def createProductBlocks(po_df, selected_pos):
     
     numbers = []
     for p in selected_pos:
@@ -19,19 +19,15 @@ def create_product_blocks(po_df, selected_pos):
         for i in range(1, num_products + 1):
             product = row[f'Product#{i}']
             if product != 'nan/nan/nan':  # Ensure the product is valid
-                valid_products.append(product)
-        
-        # Append the valid products for this row to the list
-        valid_products_per_row.append(valid_products)
+                valid_products_per_row.append(product)
     
-    print(valid_products_per_row)
-    return
+    return valid_products_per_row
 
-def initial_sol():
+def initialSol():
     return
 
 def solve(inv_df, po_df, selected_pos):
-    products = create_product_blocks(po_df, selected_pos)
+    products = createProductBlocks(po_df, selected_pos)
     
     
     
