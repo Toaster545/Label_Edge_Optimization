@@ -1,7 +1,8 @@
 import PySimpleGUI as sg
 import sys
+from algos import solve
 
-def createGui(po_df):
+def createGui(po_df, inv_df):
 # create the gui for the application start
 
     sg.theme('DarkBlue3')
@@ -33,6 +34,9 @@ def createGui(po_df):
             
         if event == 'Remove':
             removeOrder(window, values['-CHOSEN-'], selected_orders)
+        
+        if event == "Submit":
+            value = solve(inv_df=inv_df, po_df=po_df ,selected_pos=selected_items)
                 
     window.close()
 

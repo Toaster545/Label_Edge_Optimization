@@ -23,7 +23,7 @@ def main():
     
     # print(po_df)
     
-    createGui(po_df)
+    createGui(po_df, inv_df)
     
     
     #code_values = inv_df["Code LabelEdge"].unique()
