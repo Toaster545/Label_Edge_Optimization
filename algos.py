@@ -1,22 +1,50 @@
 import copy, random
 import pandas as pd
+from tqdm import tqdm
 
-def solve(inv_df, po_df, selected_pos, label_code, util_tol = 0.8, rem_tol = 0.15):
+def solve(inv_df, po_df, selected_pos, label_code, 
+          util_tol = 0.8, 
+          rem_tol = 0.15,
+          num_restarts = 100,
+          iterations = 1000):
     # Process the selected purchase orders into products and a total MSI target.
     products, total_msi = process_selected_pos(selected_pos)
     
     # Filter the inventory DataFrame for the specific label code.
     filtered_inv = filter_inventory(inv_df, label_code)
     
-    # Compute an initial solution.
-    masters = compute_initial_solution(filtered_inv, products, total_msi)
+    best_overall_waste = float('inf')
+    best_overall_masters = None
+    lengthTol = 0.1 # Should add to GUI
     
-    # Run local search to improve the solution.
-    best_masters, best_waste = local_search_solution(masters, total_msi, iterations=10000, lengthTol=0.1)
-    print_masters_table(best_masters)
+    progress_bar = tqdm(range(num_restarts), desc=f"Restart iterations | Best Waste: {best_overall_waste*100:.4f}")
+
+    for restart in progress_bar:
+        #print(f"\nRestart iteration {restart + 1}")
+        products_copy = products[:]
+        
+        # Compute an initial solution (which internally randomizes the order of masters and products)
+        masters = compute_initial_solution(filtered_inv, products_copy)
+        
+        # Run local search starting from this initial solution.
+        current_masters, current_waste = local_search_solution(masters, total_msi, iterations=iterations, lengthTol=lengthTol)
+        #print(f"  Waste after local search in restart {restart + 1}: {current_waste}")
+
+        # If the current solution is better, update the best overall solution.
+        if current_waste < best_overall_waste:
+            best_overall_waste = current_waste
+            best_overall_masters = current_masters
+        
+        progress_bar.set_description(f"Restart {restart+1}/{num_restarts} | Best Waste: {best_overall_waste*100:.4f}")
+
+    print(f"Best waste: {best_overall_waste*100:.2f}%")
+    print_masters_table(best_overall_masters)
+    
+    
     
     # Remove products from masters that are underutilized.
-    best_masters, total_msi = remove_underutilized_masters(best_masters, total_msi, min_utilization=util_tol, max_removal_fraction=rem_tol)
+    best_masters, total_msi = remove_underutilized_masters(best_overall_masters, total_msi, min_utilization=util_tol, max_removal_fraction=rem_tol)
+    
     
     # Optionally, re-run local search with the updated solution.
     best_masters, best_waste = local_search_solution(best_masters, total_msi, iterations=10000, lengthTol=0.1)
@@ -30,6 +58,9 @@ def print_masters_table(masters):
     """
     Prints a formatted table where each row represents a master
     and the columns represent the widths of the products in that master.
+    
+    - Masters are sorted in decreasing order based on their width.
+    - Product widths in each row are sorted in increasing order.
     """
     # Prepare data for DataFrame
     table_data = []
@@ -37,15 +68,16 @@ def print_masters_table(masters):
     
     for i, master in enumerate(masters):
         if master['Products']:  # Only include masters with products
-            product_widths = [p[0] for p in master['Products']]  # Extract widths
+            product_widths = sorted([p[0] for p in master['Products']], reverse=True)  # Sort widths in increasing order
             max_products = max(max_products, len(product_widths))  # Update max products
-            table_data.append([int(master['Width'])] + product_widths)
+            table_data.append([int(master['Width'])] + product_widths)  # Store row data
     
     # Create column headers dynamically based on the max number of products
     column_headers = ["Master"] + [f"Product {i+1}" for i in range(max_products)]
     
-    # Convert to DataFrame and fill empty cells with "-"
+    # Convert to DataFrame and sort Masters in decreasing order
     df = pd.DataFrame(table_data, columns=column_headers).fillna("-")
+    df = df.sort_values(by="Master", ascending=False)  # Sort by master width in decreasing order
     
     # Print formatted table
     print(df.to_string(index=False))
@@ -121,15 +153,15 @@ def filter_inventory(inv_df, label_code):
     filtered_df = filtered_df.drop(columns=['Code LabelEdge'])
     return filtered_df
 
-def compute_initial_solution(inv_df, products, total_msi):
+def compute_initial_solution(inv_df, products):
     """
     Create the master dictionary from inventory and assign products initially.
     Also print the waste of the initial solution.
     """
     masters = createMasterDict(inv_df=inv_df)
     masters = initialSol(masters, products)
-    waste = calculateWaste(masters, total_msi)
-    print("Initial waste:", waste)
+    waste = calculateWaste(masters)
+    #print("Initial waste:", waste)
     return masters
 
 def local_search_solution(masters, total_msi, iterations=10000, lengthTol=0.1):
@@ -137,7 +169,7 @@ def local_search_solution(masters, total_msi, iterations=10000, lengthTol=0.1):
     Improve the solution using local search.
     """
     best_masters, best_waste = localSearch(masters, total_msi, iterations=iterations, lengthTol=lengthTol)
-    print("Best waste found:", best_waste)
+    #print("Best waste found:", best_waste)
     return best_masters, best_waste
 
 def remove_underutilized_masters(masters, total_msi, min_utilization=0.8, max_removal_fraction=0.5):
@@ -154,7 +186,7 @@ def remove_underutilized_masters(masters, total_msi, min_utilization=0.8, max_re
     """
     import copy
     # Compute the original waste value.
-    orig_waste = calculateWaste(masters, total_msi)
+    orig_waste = calculateWaste(masters)
     
     # Create a deep copy of the masters and total_msi to test removals.
     new_masters = copy.deepcopy(masters)
@@ -203,7 +235,7 @@ def remove_underutilized_masters(masters, total_msi, min_utilization=0.8, max_re
             print(f"Removed {count} of product (Width={key[0]}, Length={key[1]}, MSI per product={key[2]})")
     
     # Compute the new waste value after removals.
-    new_waste = calculateWaste(new_masters, new_total_msi)
+    new_waste = calculateWaste(new_masters)
     print("Original waste:", orig_waste, "New waste:", new_waste)
     
     # Accept the new solution only if the waste is improved.
@@ -215,6 +247,9 @@ def remove_underutilized_masters(masters, total_msi, min_utilization=0.8, max_re
         return masters, total_msi
 
 def initialSol(masters, products, lengthTol = 0.1):
+    
+    random.shuffle(masters)
+    random.shuffle(products)
     
     # Iterate over a copy of the list so we can modify the original safely
     for p in products[:]:  # Using products[:] creates a shallow copy
@@ -230,14 +265,24 @@ def initialSol(masters, products, lengthTol = 0.1):
     
     return masters
 
-def calculateWaste(masters, total_prod):
+def calculateWaste(masters):
+    
     # Compute total MSI for all masters that have at least one product
     total_msi = sum((m['Length'] * m['Width'] * 12) / 1000 for m in masters if m['Products'])
 
-    # Output the result
-    waste = abs(total_msi - total_prod)/total_prod
+    # Compute total MSI of assigned products using (Product Width * Master Length)
+    total_prod = sum((p[0] * m['Length'] * 12) / 1000 for m in masters for p in m['Products'])
+
+    if total_prod == 0:
+        return float('inf')  # If no products, waste is undefined
+
+    # Compute waste as the difference in MSI values
+    waste = abs(total_msi - total_prod) / total_prod
     return waste
 
+
+
+# Choisir master avec la plus grande perte
 def perturb_solution(masters, lengthTol=0.1):
     """
     Perturb the current assignment by removing one product from a random master 
@@ -274,12 +319,16 @@ def localSearch(masters, total_prod, iterations=1000, lengthTol=0.1):
     """
     Iteratively perturb the solution and accept changes that reduce waste.
     """
+    
+    # Add restart functionality
+    
+    
     best_masters = copy.deepcopy(masters)
-    best_waste = calculateWaste(best_masters, total_prod)
+    best_waste = calculateWaste(best_masters)
     
     for i in range(iterations):
         candidate = perturb_solution(best_masters, lengthTol)
-        candidate_waste = calculateWaste(candidate, total_prod)
+        candidate_waste = calculateWaste(candidate)
         if candidate_waste < best_waste:
             best_masters, best_waste = candidate, candidate_waste
             # Optionally, print or log progress:
