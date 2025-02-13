@@ -3,7 +3,9 @@ import pandas as pd
 from tqdm import tqdm
 from utils import print_masters_table, createMasterDict, createProductBlocks, process_selected_pos, filter_inventory
 
-
+###
+# Main function
+###
 def solve(inv_df, po_df, selected_pos, label_code, 
           util_tol = 0.8, 
           rem_tol = 0.15,

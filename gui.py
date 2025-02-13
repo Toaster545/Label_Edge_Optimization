@@ -1,148 +1,263 @@
-import PySimpleGUI as sg
 import sys
+from PyQt5 import QtWidgets, QtCore, QtGui
 from algos import solve, createProductBlocks
 
+class OrderSelectionDialog(QtWidgets.QDialog):
+    def __init__(self, po_list, po_df, parent=None):
+        super().__init__(parent)
+        self.po_list = po_list
+        self.po_df = po_df
+        self.products = []
+        self.selected_orders = []
+        self.setWindowTitle("Order Selector")
+        self.resize(800, 600)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+
+        # Header
+        header = QtWidgets.QLabel("Check all wanted orders")
+        header.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Bold))
+        main_layout.addWidget(header)
+
+        # Scrollable area for order checkboxes
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_content = QtWidgets.QWidget()
+        self.orders_layout = QtWidgets.QVBoxLayout(scroll_content)
+        self.checkboxes = []
+
+        for i, order in enumerate(po_list):
+            cb = QtWidgets.QCheckBox(order)
+            self.checkboxes.append(cb)
+            self.orders_layout.addWidget(cb)
+
+        scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(scroll_area)
+
+        # Buttons: Back and Submit
+        btn_layout = QtWidgets.QHBoxLayout()
+        back_btn = QtWidgets.QPushButton("Back")
+        back_btn.clicked.connect(self.reject)  # Cancel the dialog
+        submit_btn = QtWidgets.QPushButton("Submit")
+        submit_btn.clicked.connect(self.submit)
+        btn_layout.addWidget(back_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(submit_btn)
+        main_layout.addLayout(btn_layout)
+
+    def submit(self):
+        # Gather checked orders
+        self.selected_orders = [cb.text() for cb in self.checkboxes if cb.isChecked()]
+        # Create product blocks based on the selected orders
+        self.products = createProductBlocks(self.po_df, self.selected_orders)
+        self.accept()
+
+    def get_products(self):
+        return self.products
+
+
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self, po_df, inv_df):
+        super().__init__()
+        self.po_df = po_df
+        self.inv_df = inv_df
+        self.products = []  
+        self.product_checkboxes = []
+
+        self.setWindowTitle("LabelEdge Optimiser")
+        self.resize(800, 600)
+
+        self.central_widget = QtWidgets.QWidget()
+        self.setCentralWidget(self.central_widget)
+
+        # Use a QStackedWidget to hold different "pages" of the UI.
+        self.stacked_widget = QtWidgets.QStackedWidget()
+        main_layout = QtWidgets.QVBoxLayout(self.central_widget)
+        main_layout.addWidget(self.stacked_widget)
+
+        self.init_initial_page()
+        self.init_base_page()  # Create the base page (it will be updated later)
+        self.stacked_widget.setCurrentIndex(0)
+
+    def init_initial_page(self):
+        """Initial page with the 'Choose Orders' button."""
+        self.initial_page = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(self.initial_page)
+        layout.addStretch()
+        self.choose_orders_button = QtWidgets.QPushButton("Choose Orders")
+        self.choose_orders_button.setFixedSize(150, 50)
+        self.choose_orders_button.clicked.connect(self.choose_orders)
+        layout.addWidget(self.choose_orders_button, alignment=QtCore.Qt.AlignCenter)
+        layout.addStretch()
+        self.stacked_widget.addWidget(self.initial_page)
+
+    def init_base_page(self):
+        """Base page that will display products, papers, and input fields."""
+        self.base_page = QtWidgets.QWidget()
+        self.base_layout = QtWidgets.QVBoxLayout(self.base_page)
+        # Initially empty; will be populated after orders are chosen.
+        self.stacked_widget.addWidget(self.base_page)
+
+    def choose_orders(self):
+        """Open the order selection dialog."""
+        po_list = (self.po_df['No'].astype(str) + " " +
+                   self.po_df['Vendu à'].astype(str) + " " +
+                   self.po_df['No Commande'].astype(str)).tolist()
+
+        dlg = OrderSelectionDialog(po_list, self.po_df, self)
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            self.products = dlg.get_products()
+            self.update_base_layout()
+            self.stacked_widget.setCurrentIndex(1)
+        # If the dialog is rejected (via its Back button), do nothing;
+        # the user remains on the initial page.
+
+    def update_base_layout(self):
+        """Build the main (base) UI with products, papers, inputs, and buttons."""
+        # Clear any existing content in the base layout
+        for i in reversed(range(self.base_layout.count())):
+            item = self.base_layout.itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+            else:
+                self.clear_layout(item.layout())
+
+        # Create the products/papers view
+        content_layout = QtWidgets.QHBoxLayout()
+
+        # Left: Products (as checkboxes inside a scroll area)
+        product_group = QtWidgets.QGroupBox("Products")
+        self.product_layout = QtWidgets.QVBoxLayout()
+        self.product_checkboxes = []
+        for prod in self.products:
+            cb = QtWidgets.QCheckBox(prod)
+            self.product_checkboxes.append(cb)
+            self.product_layout.addWidget(cb)
+        product_group.setLayout(self.product_layout)
+        product_scroll = QtWidgets.QScrollArea()
+        product_scroll.setWidget(product_group)
+        product_scroll.setWidgetResizable(True)
+        product_scroll.setFixedSize(250, 300)
+        content_layout.addWidget(product_scroll)
+
+        # Right: Papers (as radio buttons inside a scroll area)
+        paper_group = QtWidgets.QGroupBox("Papers")
+        paper_layout = QtWidgets.QVBoxLayout()
+        self.paper_button_group = QtWidgets.QButtonGroup(self)
+        papers = sorted([p for p in self.inv_df['Code LabelEdge'].dropna().unique()])
+        for i, paper in enumerate(papers):
+            rb = QtWidgets.QRadioButton(paper)
+            if i == 2:  # Pre-select the third paper, if available
+                rb.setChecked(True)
+            self.paper_button_group.addButton(rb, i)
+            paper_layout.addWidget(rb)
+        paper_group.setLayout(paper_layout)
+        paper_scroll = QtWidgets.QScrollArea()
+        paper_scroll.setWidget(paper_group)
+        paper_scroll.setWidgetResizable(True)
+        paper_scroll.setFixedSize(250, 300)
+        content_layout.addWidget(paper_scroll)
+
+        self.base_layout.addLayout(content_layout)
+
+        # Input fields for percentages
+        input_layout = QtWidgets.QHBoxLayout()
+        full_label = QtWidgets.QLabel('Percentage of "Full" master roll:')
+        self.full_input = QtWidgets.QLineEdit("0.8")
+        rem_label = QtWidgets.QLabel("Max Removal Percentage:")
+        self.rem_input = QtWidgets.QLineEdit("0.1")
+        input_layout.addWidget(full_label)
+        input_layout.addWidget(self.full_input)
+        input_layout.addSpacing(20)
+        input_layout.addWidget(rem_label)
+        input_layout.addWidget(self.rem_input)
+        self.base_layout.addLayout(input_layout)
+
+        # Input fields for restarts and iterations
+        input_layout2 = QtWidgets.QHBoxLayout()
+        restarts_label = QtWidgets.QLabel("Restarts:")
+        self.restarts_input = QtWidgets.QLineEdit("300")
+        iterations_label = QtWidgets.QLabel("Iterations:")
+        self.iterations_input = QtWidgets.QLineEdit("10")
+        input_layout2.addWidget(restarts_label)
+        input_layout2.addWidget(self.restarts_input)
+        input_layout2.addSpacing(20)
+        input_layout2.addWidget(iterations_label)
+        input_layout2.addWidget(self.iterations_input)
+        self.base_layout.addLayout(input_layout2)
+
+        # Buttons: Back, Remove, Submit, Exit
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.back_button = QtWidgets.QPushButton("Back")
+        self.back_button.clicked.connect(self.back_to_initial)
+        self.remove_button = QtWidgets.QPushButton("Remove")
+        self.remove_button.clicked.connect(self.remove_selected_products)
+        self.submit_button = QtWidgets.QPushButton("Submit")
+        self.submit_button.clicked.connect(self.submit)
+        self.exit_button = QtWidgets.QPushButton("Exit")
+        self.exit_button.clicked.connect(self.close)
+        btn_layout.addWidget(self.back_button)
+        btn_layout.addWidget(self.remove_button)
+        btn_layout.addWidget(self.submit_button)
+        btn_layout.addWidget(self.exit_button)
+        self.base_layout.addLayout(btn_layout)
+
+    def clear_layout(self, layout):
+        if layout is not None:
+            while layout.count():
+                child = layout.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
+                elif child.layout():
+                    self.clear_layout(child.layout())
+
+    def back_to_initial(self):
+        """Switch back to the initial page with the 'Choose Orders' button."""
+        self.stacked_widget.setCurrentIndex(0)
+
+    def remove_selected_products(self):
+        """Remove any product checkboxes that are checked."""
+        for cb in self.product_checkboxes[:]:
+            if cb.isChecked():
+                self.product_layout.removeWidget(cb)
+                cb.deleteLater()
+                self.product_checkboxes.remove(cb)
+
+    def submit(self):
+        # Gather selected products
+        selected_products = [cb.text() for cb in self.product_checkboxes if cb.isChecked()]
+        # Get the selected paper
+        selected_button = self.paper_button_group.checkedButton()
+        if selected_button is None:
+            QtWidgets.QMessageBox.warning(self, "Error", "Please select a paper.")
+            return
+        selected_paper_value = selected_button.text()
+
+        try:
+            util_tol = float(self.full_input.text())
+            rem_tol = float(self.rem_input.text())
+            restarts = int(self.restarts_input.text())
+            iterations = int(self.iterations_input.text())
+        except ValueError:
+            QtWidgets.QMessageBox.warning(self, "Error", "Invalid input for tolerances or iterations.")
+            return
+
+        # Call the solve function
+        result = solve(
+            inv_df=self.inv_df,
+            po_df=self.po_df,
+            selected_pos=selected_products,
+            label_code=selected_paper_value,
+            util_tol=util_tol,
+            rem_tol=rem_tol,
+            num_restarts=restarts,
+            iterations=iterations,
+        )
+        QtWidgets.QMessageBox.information(self, "Result", "Solve function executed.")
+
 def createGui(po_df, inv_df):
-# create the gui for the application start
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow(po_df, inv_df)
+    window.show()
+    sys.exit(app.exec_())
 
-    sg.theme('DarkBlue3')
-    
-    selected_orders = []
-    products = []
-    po_list = (po_df['No'].astype(str) + " " + po_df['Vendu à'].astype(str) + " " +  po_df['No Commande'].astype(str)).tolist()
-    
-    layout = [
-    [sg.Button("Choose Orders", button_color=("black", "white"), size=(15, 2), border_width=10)]
-    ]
-    
-    
-    window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
-
-    while True:
-        event, values = window.read()
-        
-        if event == sg.WINDOW_CLOSED or event == "Exit":
-            break
-        
-        if event == 'Choose Orders':
-            temp = openOrders(inv_df, po_df, po_list)
-            layout = temp[0]
-            products = temp[1]
-            window.close()
-            window = sg.Window("LabelEdge Optimiser", layout, size=(800, 600), resizable=True)
-            event, values = window.read()
-            
-        # useless functions for now
-        if event == 'Add':
-            addOrder(window, values['-DROPDOWN-'], selected_orders)
-            
-        if event == 'Remove':
-            removeOrder(window, values['-CHOSEN-'], selected_orders)
-        
-        if event == "Submit":
-            
-            papers = inv_df['Code LabelEdge'].unique()
-            selected_paper_key = next((key for key, val in values.items() if key.startswith("-PAPER_") and val), None)
-            util_tol = float(values["-INPUT1-"])
-            rem_tol = float(values["-INPUT2-"])
-            restarts = int(values["-INPUT3-"])
-            iterations = int(values["-INPUT3-"])
-
-            # Extract the actual paper value using the index
-            if selected_paper_key:
-                selected_index = int(selected_paper_key.replace("-PAPER_", "").replace("-", ""))
-                selected_paper_value = papers[selected_index]
-            
-            value = solve(inv_df=inv_df, 
-                          po_df=po_df ,
-                          selected_pos=[products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]], 
-                          label_code=selected_paper_value,
-                          util_tol=util_tol, 
-                          rem_tol=rem_tol,
-                          num_restarts=restarts,
-                          iterations=iterations,
-                          )
-                
-    window.close()
-
-
-# Creat a window to selct orders from checkbox
-def openOrders(inv_df, po_df, po_list):
-    
-    # setup the layout of the order window
-    new_layout = [
-        [sg.Text("Check all wanted orders", font=("Arial", 14, "bold"))],
-        *[[sg.Checkbox(task, key=f"-ORDER_{i}-")] for i, task in enumerate(po_list)],  # Each checkbox is in its own list
-        [sg.Button("Submit")]
-    ]
-    
-    new_window = sg.Window("Order Selector", new_layout, size=(800, 600), resizable=True)
-    
-    # loop to keep the order window open
-    while True:
-        event, values = new_window.read()
-        
-        if event == sg.WINDOW_CLOSED or event == "Exit":
-            break
-        
-        if event == 'Submit':
-            checked_orders = [po_list[i] for i in range(len(po_list)) if values[f"-ORDER_{i}-"]]
-            products = createProductBlocks(po_df, checked_orders)
-            layout = updateBase(inv_df, products)
-            break
-        
-    new_window.close()
-    
-    return [layout, products]
-            
-# Update the base with the selected orders
-def updateBase(inv_df, products):
-    papers = inv_df['Code LabelEdge'].unique()
-    papers = sorted(inv_df['Code LabelEdge'].dropna().unique())
-    
-    layout = [
-        [sg.Text("All orders to be processed")],
-        [
-            sg.Column(
-                [[sg.Checkbox(task, key=f"-PROD_{i}-")] for i, task in enumerate(products)], 
-                size=(200, 300), scrollable=True, vertical_scroll_only=True
-            ),
-            sg.VSeparator(),
-            sg.Column(
-                [[sg.Radio(task, "PAPER_GROUP", key=f"-PAPER_{i}-", default=(i == 2))] for i, task in enumerate(papers)], 
-                size=(200, 300), scrollable=True, vertical_scroll_only=True
-            )
-        ],
-        [
-        sg.Text("Percentage of \"Full\" master roll:"), sg.InputText(default_text="0.8", key="-INPUT1-", size=(10, 1)),
-        sg.Text("Max Removal Percentage :"), sg.InputText(default_text="0.1", key="-INPUT2-", size=(10, 1))
-        ],
-        [
-        sg.Text("Restarts:"), sg.InputText(default_text="300", key="-INPUT3-", size=(10, 1)),
-        sg.Text("Iterations :"), sg.InputText(default_text="10", key="-INPUT4-", size=(10, 1))
-        ],
-        [sg.Button("Remove"), sg.Button("Submit"), sg.Button("Exit")]
-    ]
-    
-    return layout
-    
-def selectProducts(products, values):
-    checked_products = [products[i] for i in range(len(products)) if values[f"-PROD_{i}-"]]
-
-    return checked_products
-                
-
-# Add order from dropdown to list box  
-def addOrder(window, selected_option, selected_orders):
-    if selected_option not in selected_orders:
-        selected_orders.append(selected_option)
-        window['-CHOSEN-'].update(selected_orders)
-        
-        
-# Remove selected orders from list box  
-def removeOrder(window, items_to_delete, selected_orders):
-    if items_to_delete:  # Check if an item is selected
-        for item in items_to_delete:
-            if item in selected_orders:
-                selected_orders.remove(item)  # Remove the item from the list
-        window['-CHOSEN-'].update(selected_orders)
