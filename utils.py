@@ -59,7 +59,7 @@ def createMasterDict(inv_df):
     masterDict = []
     
     for index, row in inv_df.iterrows():
-        code = float(row['Code achat'])
+        code = (row['Roll ID'])
         width = float(row['Larg.'])
         length = float(row['Longueur'])
         tempDict = {'Code': code, 'Width': width, 'Length': length, 'Products': []}
