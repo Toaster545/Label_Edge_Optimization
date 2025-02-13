@@ -54,7 +54,7 @@ def createProductBlocks(po_df, selected_pos):
     
     return valid_products_per_row
 
-def createMasterDict(inv_df):
+def createMasterDict(inv_df, length):
     
     masterDict = []
     
