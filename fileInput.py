@@ -51,7 +51,7 @@ def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
 
 def filter_po_df(df, start_row):
     df = df.loc[df['Actif / Inactif'] == 'A']
-    po_df = df.loc[df['No'] >=start_row]
+    po_df = df.loc[df['No'] >= start_row]
     po_df = po_df[po_df["Vendu à"].notna()]
     
     start_column = "Code Prix 1"
