@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 def xlsm_to_dataframe(xlsm_file, sheet_name, start_row=3):
     """
     Reads a specific sheet from an .xlsm file, starting from a specified row, and converts it to a Pandas DataFrame.
@@ -30,37 +29,42 @@ def xlsm_to_dataframe(xlsm_file, sheet_name, start_row=3):
         print(f"Error: The file '{xlsm_file}' was not found.")
         return None
     
-def filter_inv_df(df, label_code, actIna="A", orderBy = "Larg."):
-    df = df.loc[df['Actif / Inactif'] == actIna]
+def filter_inv_df(df,
+                  actIna="A", 
+                  orderBy = "Larg.",
+                  activeLabel = 'Actif / Inactif',
+                  idLabel = "Roll ID",
+                  paperLabel = "Code LabelEdge",
+                  widthLabel = 'Larg.',
+                  lengthLabel = 'Longueur'):
+    
+    df = df.loc[df[activeLabel] == actIna]
     df = df.sort_values(by=orderBy, ascending=True)
-    df = df.reset_index(drop=True)
     df = convert_units(df)
     
-    code_values = df["Code LabelEdge"].unique()
-
-    # Print the unique values
-    #print("Unique code values in 'Code LabelEdge':")
-    #print(code_values)
-    
-    # Filtering 
-    #df = df.loc[df["Code LabelEdge"] == label_code]
-    df = df[["Roll ID", "Code LabelEdge", "Larg.", "Longueur"]]
+    df = df[[idLabel, paperLabel, widthLabel, lengthLabel]]
     
     df = df.reset_index(drop=True)
     return df
 
-def filter_po_df(df, start_row):
-    df = df.loc[df['Actif / Inactif'] == 'A']
-    po_df = df.loc[df['No'] >= start_row]
-    po_df = po_df[po_df["Vendu à"].notna()]
+def filter_po_df(df, start_row,
+                 actIna="A",
+                 activeLabel = 'Actif / Inactif',
+                 numberLabel = 'No',
+                 startColLabel = "Code Prix 1",
+                 companyLabel = "Vendu à",
+                 orderLabel = 'No Commande'
+                 ):
+    df = df.loc[df[activeLabel] == actIna]
+    po_df = df.loc[df[numberLabel] >= start_row]
+    po_df = po_df[po_df[companyLabel].notna()]
     
-    start_column = "Code Prix 1"
-    named_columns = ["No", "Vendu à", "No Commande"]
-    start_index = po_df.columns.get_loc(start_column)
+    named_columns = [numberLabel, companyLabel, orderLabel]
+    start_index = po_df.columns.get_loc(startColLabel)
     columns_to_keep = named_columns + list(po_df.columns[start_index:])
     po_df = po_df[columns_to_keep]
     
-    po_df = process_groups(po_df, start_column)
+    po_df = process_groups(po_df, startColLabel)
     po_df = po_df.reset_index(drop=True)
     
     return po_df

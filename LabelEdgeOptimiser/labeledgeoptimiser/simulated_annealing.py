@@ -1,7 +1,7 @@
 import copy, random, math
 import pandas as pd
 from tqdm import tqdm
-from utils import print_masters_table, createMasterDict, createProductBlocks, process_selected_pos, filter_inventory
+from labeledgeoptimiser.utils import print_masters_table, createMasterDict, process_selected_pos, filter_inventory
 
 ########################################
 # Helper: Check Validity of a Solution

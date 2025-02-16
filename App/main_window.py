@@ -1,139 +1,9 @@
-import sys, os, copy, random, math, traceback, configparser
-import pandas as pd
+import os, configparser
 from PyQt5 import QtWidgets, QtCore, QtGui
-from algos import createProductBlocks, process_selected_pos, filter_inventory, print_masters_table
-import simulated_annealing as sa  # Assumes your SA-based solve() and related functions are here
-from fileInput import xlsm_to_dataframe, filter_inv_df, filter_po_df
+from algos import createProductBlocks
+from LabelEdgeOptimiser.labeledgeoptimiser.fileInput import xlsm_to_dataframe, filter_inv_df, filter_po_df
+from LabelEdgeOptimiser.labeledgeoptimiser.solution_dialog import SolutionDialog
 
-CONFIG_FILE = "config.ini"
-
-########################################
-# Worker for Asynchronous Solve
-########################################
-class SolveWorker(QtCore.QObject):
-    progressChanged = QtCore.pyqtSignal(int)
-    finished = QtCore.pyqtSignal(object)
-    errorOccurred = QtCore.pyqtSignal(str)
-    
-    def __init__(self, inv_df, po_df, selected_pos, label_code, 
-                 util_tol, rem_tol, len_tol, num_restarts, iterations):
-        super().__init__()
-        self.inv_df = inv_df
-        self.po_df = po_df
-        self.selected_pos = selected_pos
-        self.label_code = label_code
-        self.util_tol = util_tol
-        self.rem_tol = rem_tol
-        self.len_tol = len_tol
-        self.num_restarts = num_restarts
-        self.iterations = iterations
-        self._isCanceled = False
-        
-    def cancel(self):
-        self._isCanceled = True
-        
-    def run(self):
-        try:
-            best_overall_waste = float('inf')
-            best_overall_masters = None
-            products, total_msi = process_selected_pos(self.selected_pos)
-            original_product_count = len(products)
-            filtered_inv = filter_inventory(self.inv_df, self.label_code)
-            
-            for restart in range(self.num_restarts):
-                if self._isCanceled:
-                    self.finished.emit(None)
-                    return
-                products_copy = products[:]
-                masters = sa.compute_initial_solution(filtered_inv, products_copy, self.len_tol)
-                candidate_masters, candidate_waste = sa.local_search_solution(
-                    masters, total_msi, iterations=self.iterations, lengthTol=self.len_tol,
-                    initial_temp=1.0, cooling_rate=0.99
-                )
-                if candidate_waste < best_overall_waste:
-                    best_overall_waste = candidate_waste
-                    best_overall_masters = candidate_masters
-                progress_percent = int(100 * (restart + 1) / self.num_restarts)
-                self.progressChanged.emit(progress_percent)
-            
-            if best_overall_masters is None or not sa.is_valid_solution(best_overall_masters, original_product_count):
-                self.errorOccurred.emit("No solution found using current number of Products")
-                self.finished.emit(None)
-            else:
-                self.finished.emit(best_overall_masters)
-        except Exception as e:
-            self.errorOccurred.emit(traceback.format_exc())
-            self.finished.emit(None)
-
-########################################
-# Dialog to Display the Solution
-########################################
-class SolutionDialog(QtWidgets.QDialog):
-    def __init__(self, masters, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Solution")
-        self.resize(800, 600)
-        layout = QtWidgets.QVBoxLayout(self)
-        
-        overall_waste = sa.calculateWaste(masters)
-        waste_label = QtWidgets.QLabel(f"Overall Waste: {overall_waste:.2f}%")
-        waste_label.setFont(QtGui.QFont("Arial", 12))
-        layout.addWidget(waste_label)
-        
-        df = self.build_dataframe(masters)
-        table = QtWidgets.QTableWidget()
-        table.setRowCount(df.shape[0])
-        table.setColumnCount(df.shape[1])
-        table.setHorizontalHeaderLabels(df.columns.tolist())
-        for i in range(df.shape[0]):
-            for j in range(df.shape[1]):
-                item = QtWidgets.QTableWidgetItem(str(df.iloc[i, j]))
-                table.setItem(i, j, item)
-        table.resizeColumnsToContents()
-        layout.addWidget(table)
-        
-        btn_layout = QtWidgets.QHBoxLayout()
-        download_btn = QtWidgets.QPushButton("Download")
-        download_btn.clicked.connect(lambda: self.download_dataframe(df))
-        back_btn = QtWidgets.QPushButton("Back")
-        back_btn.clicked.connect(self.close)
-        exit_btn = QtWidgets.QPushButton("Exit")
-        exit_btn.clicked.connect(QtWidgets.QApplication.instance().quit)
-        btn_layout.addWidget(download_btn)
-        btn_layout.addWidget(back_btn)
-        btn_layout.addWidget(exit_btn)
-        layout.addLayout(btn_layout)
-    
-    def build_dataframe(self, masters):
-        table_data = []
-        max_products = 0
-        for master in masters:
-            master_msi = (master['Width'] * master['Length'] * 12) / 1000
-            for block, waste in zip(master['Products'], master['Waste']):
-                if not block:
-                    continue
-                product_widths = sorted([p[0] for p in block], reverse=True)
-                max_products = max(max_products, len(product_widths))
-                block_msi = (sum(p[0] for p in block) * master['Length'] * 12) / 1000
-                table_data.append([master['Code'], master['Width'], master['Length'], f"{waste:.2f}%", master_msi, block_msi] + product_widths)
-        column_headers = ["Master ID", "Width", "Length", "Waste", "Master MSI", "Block MSI"] + [f"Product {i+1}" for i in range(max_products)]
-        df = pd.DataFrame(table_data, columns=column_headers).fillna("-")
-        df = df.sort_values(by="Master ID", ascending=False)
-        return df
-    
-    def download_dataframe(self, df):
-        options = QtWidgets.QFileDialog.Options()
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save Solution", "", "CSV Files (*.csv);;All Files (*)", options=options)
-        if filename:
-            try:
-                df.to_csv(filename, index=False)
-                QtWidgets.QMessageBox.information(self, "Success", f"Solution saved to {filename}")
-            except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Error", str(e))
-
-########################################
-# Main Window with File Settings
-########################################
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, po_df, inv_df):
         super().__init__()
@@ -162,39 +32,60 @@ class MainWindow(QtWidgets.QMainWindow):
         self.solve_thread = None
 
     def init_file_settings_page(self):
-        """Page for setting file paths and the PO filter threshold."""
+        """Page for setting file paths, PO filter threshold, and data filter variables."""
         self.settings_page = QtWidgets.QWidget()
         layout = QtWidgets.QFormLayout(self.settings_page)
         
+        # --- File paths ---
         self.inv_path_edit = QtWidgets.QLineEdit()
         self.po_path_edit = QtWidgets.QLineEdit()
-        
         browse_inv = QtWidgets.QPushButton("Browse")
         browse_inv.clicked.connect(self.browse_inv)
         browse_po = QtWidgets.QPushButton("Browse")
         browse_po.clicked.connect(self.browse_po)
-        
         inv_layout = QtWidgets.QHBoxLayout()
         inv_layout.addWidget(self.inv_path_edit)
         inv_layout.addWidget(browse_inv)
-        
         po_layout = QtWidgets.QHBoxLayout()
         po_layout.addWidget(self.po_path_edit)
         po_layout.addWidget(browse_po)
-        
         layout.addRow("Inventory File:", inv_layout)
         layout.addRow("PO File:", po_layout)
         
-        # New: PO Filter Threshold input
+        # --- PO Filter Threshold ---
         self.po_filter_edit = QtWidgets.QLineEdit("305")
         layout.addRow("PO Filter Threshold:", self.po_filter_edit)
         
+        # --- Inventory Data Filters ---
+        self.inv_active_label_edit = QtWidgets.QLineEdit()
+        self.inv_id_label_edit = QtWidgets.QLineEdit()
+        self.inv_paper_label_edit = QtWidgets.QLineEdit()
+        self.inv_width_label_edit = QtWidgets.QLineEdit()
+        self.inv_length_label_edit = QtWidgets.QLineEdit()
+        layout.addRow("Inv Active Label:", self.inv_active_label_edit)
+        layout.addRow("Inv ID Label:", self.inv_id_label_edit)
+        layout.addRow("Inv Paper Label:", self.inv_paper_label_edit)
+        layout.addRow("Inv Width Label:", self.inv_width_label_edit)
+        layout.addRow("Inv Length Label:", self.inv_length_label_edit)
+        
+        # --- PO Data Filters ---
+        self.po_active_label_edit = QtWidgets.QLineEdit()
+        self.po_number_label_edit = QtWidgets.QLineEdit()
+        self.po_start_col_label_edit = QtWidgets.QLineEdit()
+        self.po_company_label_edit = QtWidgets.QLineEdit()
+        self.po_order_label_edit = QtWidgets.QLineEdit()
+        layout.addRow("PO Active Label:", self.po_active_label_edit)
+        layout.addRow("PO Number Label:", self.po_number_label_edit)
+        layout.addRow("PO Start Column Label:", self.po_start_col_label_edit)
+        layout.addRow("PO Company Label:", self.po_company_label_edit)
+        layout.addRow("PO Order Label:", self.po_order_label_edit)
+        
+        # --- Load Files Button ---
         load_btn = QtWidgets.QPushButton("Load Files")
         load_btn.clicked.connect(self.load_files)
         layout.addRow(load_btn)
         
         self.load_config()
-        
         self.stacked_widget.addWidget(self.settings_page)
 
     def browse_inv(self):
@@ -209,42 +100,88 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def load_config(self):
         self.config = configparser.ConfigParser()
-        if os.path.exists(CONFIG_FILE):
-            self.config.read(CONFIG_FILE)
+        if os.path.exists("config.ini"):
+            self.config.read("config.ini")
         else:
             self.config["Paths"] = {"inventory": "", "po": ""}
             self.config["Filters"] = {"po_threshold": "305"}
+            self.config["Inv"] = {"active_label": "Actif / Inactif",
+                                       "id_label": "Roll ID",
+                                       "paper_label": "Code LabelEdge",
+                                       "width_label": "Larg.",
+                                       "length_label": "Longueur"}
+            self.config["Po"] = {"active_label": "Actif / Inactif",
+                                      "number_label": "No",
+                                      "start_col_label": "Code Prix 1",
+                                      "company_label": "Vendu à",
+                                      "order_label": "No Commande"}
         self.inv_path_edit.setText(self.config["Paths"].get("inventory", ""))
         self.po_path_edit.setText(self.config["Paths"].get("po", ""))
-        if "Filters" not in self.config:
-            self.config["Filters"] = {"po_threshold": "305"}
         self.po_filter_edit.setText(self.config["Filters"].get("po_threshold", "305"))
+        # Load Inventory data filters
+        self.inv_active_label_edit.setText(self.config["Inv"].get("active_label", "Actif / Inactif"))
+        self.inv_id_label_edit.setText(self.config["Inv"].get("id_label", "Roll ID"))
+        self.inv_paper_label_edit.setText(self.config["Inv"].get("paper_label", "Code LabelEdge"))
+        self.inv_width_label_edit.setText(self.config["Inv"].get("width_label", "Larg."))
+        self.inv_length_label_edit.setText(self.config["Inv"].get("length_label", "Longueur"))
+        # Load PO data filters
+        self.po_active_label_edit.setText(self.config["Po"].get("active_label", "Actif / Inactif"))
+        self.po_number_label_edit.setText(self.config["Po"].get("number_label", "No"))
+        self.po_start_col_label_edit.setText(self.config["Po"].get("start_col_label", "Code Prix 1"))
+        self.po_company_label_edit.setText(self.config["Po"].get("company_label", "Vendu à"))
+        self.po_order_label_edit.setText(self.config["Po"].get("order_label", "No Commande"))
     
     def save_config(self):
         self.config["Paths"] = {"inventory": self.inv_path_edit.text(), "po": self.po_path_edit.text()}
-        if "Filters" not in self.config:
-            self.config["Filters"] = {}
-        self.config["Filters"]["po_threshold"] = self.po_filter_edit.text()
-        with open(CONFIG_FILE, "w") as f:
+        self.config["Filters"] = {"po_threshold": self.po_filter_edit.text()}
+        self.config["Inv"] = {
+            "active_label": self.inv_active_label_edit.text(),
+            "id_label": self.inv_id_label_edit.text(),
+            "paper_label": self.inv_paper_label_edit.text(),
+            "width_label": self.inv_width_label_edit.text(),
+            "length_label": self.inv_length_label_edit.text()
+        }
+        self.config["Po"] = {
+            "active_label": self.po_active_label_edit.text(),
+            "number_label": self.po_number_label_edit.text(),
+            "start_col_label": self.po_start_col_label_edit.text(),
+            "company_label": self.po_company_label_edit.text(),
+            "order_label": self.po_order_label_edit.text()
+        }
+        with open("config.ini", "w") as f:
             self.config.write(f)
     
     def load_files(self):
         self.save_config()
         try:
             self.inv_df = xlsm_to_dataframe(xlsm_file=self.inv_path_edit.text(), sheet_name="Papier", start_row=3)
-            self.inv_df = filter_inv_df(self.inv_df, "S21-1")
+            self.inv_df = filter_inv_df(
+                self.inv_df,
+                activeLabel=self.inv_active_label_edit.text(),
+                idLabel=self.inv_id_label_edit.text(),
+                paperLabel=self.inv_paper_label_edit.text(),
+                widthLabel=self.inv_width_label_edit.text(),
+                lengthLabel=self.inv_length_label_edit.text()
+            )
             self.po_df = xlsm_to_dataframe(xlsm_file=self.po_path_edit.text(), sheet_name="PO Client", start_row=1)
             po_threshold = int(self.po_filter_edit.text())
-            self.po_df = filter_po_df(self.po_df, po_threshold)
+            self.po_df = filter_po_df(
+                self.po_df,
+                po_threshold,
+                activeLabel=self.po_active_label_edit.text(),
+                numberLabel=self.po_number_label_edit.text(),
+                startColLabel=self.po_start_col_label_edit.text(),
+                companyLabel=self.po_company_label_edit.text(),
+                orderLabel=self.po_order_label_edit.text()
+            )
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", str(e))
             return
-        # Instead of going to an intermediate "choose orders" page,
-        # immediately open the order selection dialog.
+        # Immediately open the order selection dialog.
         self.choose_orders()
     
     def init_base_page(self):
-        """Base page that will display products, papers, inputs, and buttons."""
+        """Base page that displays products, papers, inputs, and buttons."""
         self.base_page = QtWidgets.QWidget()
         self.base_layout = QtWidgets.QVBoxLayout(self.base_page)
         self.stacked_widget.addWidget(self.base_page)
@@ -257,8 +194,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
             self.products = dlg.get_products()
             self.update_base_layout()
-            # Now that the orders have been chosen, switch to the base page.
-            # (Note: With the removal of the initial page, base page is now at index 1.)
             self.stacked_widget.setCurrentIndex(1)
 
     def update_base_layout(self):
@@ -270,8 +205,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.clear_layout(item.layout())
 
         content_layout = QtWidgets.QHBoxLayout()
-
-        # Left: Products (checkboxes)
+        # Left: Products checkboxes
         product_group = QtWidgets.QGroupBox("Products")
         self.product_layout = QtWidgets.QVBoxLayout()
         self.product_checkboxes = []
@@ -287,7 +221,7 @@ class MainWindow(QtWidgets.QMainWindow):
         product_scroll.setFixedSize(250, 300)
         content_layout.addWidget(product_scroll)
 
-        # Right: Papers (checkboxes)
+        # Right: Papers checkboxes
         paper_group = QtWidgets.QGroupBox("Papers")
         paper_layout = QtWidgets.QVBoxLayout()
         self.paper_button_group = []
@@ -363,8 +297,7 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_layout.addWidget(self.submit_button)
         btn_layout.addWidget(self.exit_button)
         self.base_layout.addLayout(btn_layout)
-        
-
+    
     def clear_layout(self, layout):
         if layout is not None:
             while layout.count():
@@ -373,18 +306,17 @@ class MainWindow(QtWidgets.QMainWindow):
                     child.widget().deleteLater()
                 elif child.layout():
                     self.clear_layout(child.layout())
-
+    
     def back_to_initial(self):
-        # With the removal of the initial page, going "back" now returns to the file settings page.
         self.stacked_widget.setCurrentIndex(0)
-
+    
     def remove_selected_products(self):
         for cb in self.product_checkboxes[:]:
             if cb.isChecked():
                 self.product_layout.removeWidget(cb)
                 cb.deleteLater()
                 self.product_checkboxes.remove(cb)
-
+    
     def start_solve(self):
         try:
             util_tol = float(self.full_input.text())
@@ -404,6 +336,8 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.submit_button.setEnabled(False)
         
+        # Import SolveWorker from solve_worker.py
+        from LabelEdgeOptimiser.labeledgeoptimiser.solve_worker import SolveWorker
         self.solve_worker = SolveWorker(
             inv_df=self.inv_df,
             po_df=self.po_df,
@@ -442,9 +376,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def handle_solve_error(self, error_msg):
         QtWidgets.QMessageBox.critical(self, "Error", error_msg)
 
-########################################
-# Order Selection Dialog
-########################################
 class OrderSelectionDialog(QtWidgets.QDialog):
     def __init__(self, po_list, po_df, parent=None):
         super().__init__(parent)
@@ -489,99 +420,3 @@ class OrderSelectionDialog(QtWidgets.QDialog):
     
     def get_products(self):
         return self.products
-
-########################################
-# Main Application GUI and Main Function
-########################################
-def createGui(po_df, inv_df):
-    app = QtWidgets.QApplication(sys.argv)
-    
-    # Load external stylesheet
-    try:
-        with open("styles.qss", "r") as style_file:
-            app.setStyleSheet(style_file.read())
-    except Exception as e:
-        print("Could not load stylesheet:", e)
-    
-    window = MainWindow(po_df, inv_df)
-    window.show()
-    sys.exit(app.exec_())
-
-
-def main():
-    # Load file paths and PO filter threshold from config.ini
-    import configparser
-    config = configparser.ConfigParser()
-    if os.path.exists(CONFIG_FILE):
-        config.read(CONFIG_FILE)
-    else:
-        config["Paths"] = {"inventory": "", "po": ""}
-        config["Filters"] = {"po_threshold": "305"}
-    inv_path = config["Paths"].get("inventory", "")
-    po_path = config["Paths"].get("po", "")
-    if "Filters" in config and "po_threshold" in config["Filters"]:
-        po_threshold = int(config["Filters"]["po_threshold"])
-    else:
-        po_threshold = 305
-    
-    # If paths are not set, prompt the user to select files and PO threshold.
-    if not inv_path or not po_path:
-        app = QtWidgets.QApplication(sys.argv)
-        dlg = QtWidgets.QDialog()
-        dlg.setWindowTitle("Select File Paths")
-        dlg_layout = QtWidgets.QFormLayout(dlg)
-        inv_edit = QtWidgets.QLineEdit()
-        po_edit = QtWidgets.QLineEdit()
-        po_threshold_edit = QtWidgets.QLineEdit(str(po_threshold))
-        browse_inv = QtWidgets.QPushButton("Browse")
-        browse_po = QtWidgets.QPushButton("Browse")
-        def browse_inv_func():
-            filename, _ = QtWidgets.QFileDialog.getOpenFileName(dlg, "Select Inventory File", "", "Excel Files (*.xlsx *.xlsm);;All Files (*)")
-            if filename:
-                inv_edit.setText(filename)
-        def browse_po_func():
-            filename, _ = QtWidgets.QFileDialog.getOpenFileName(dlg, "Select PO File", "", "Excel Files (*.xlsx *.xlsm);;All Files (*)")
-            if filename:
-                po_edit.setText(filename)
-        browse_inv.clicked.connect(browse_inv_func)
-        browse_po.clicked.connect(browse_po_func)
-        inv_layout = QtWidgets.QHBoxLayout()
-        inv_layout.addWidget(inv_edit)
-        inv_layout.addWidget(browse_inv)
-        po_layout = QtWidgets.QHBoxLayout()
-        po_layout.addWidget(po_edit)
-        po_layout.addWidget(browse_po)
-        dlg_layout.addRow("Inventory File:", inv_layout)
-        dlg_layout.addRow("PO File:", po_layout)
-        dlg_layout.addRow("PO Filter Threshold:", po_threshold_edit)
-        button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
-        dlg_layout.addRow(button_box)
-        button_box.accepted.connect(dlg.accept)
-        button_box.rejected.connect(dlg.reject)
-        if dlg.exec_() == QtWidgets.QDialog.Accepted:
-            inv_path = inv_edit.text()
-            po_path = po_edit.text()
-            po_threshold = int(po_threshold_edit.text())
-            config["Paths"]["inventory"] = inv_path
-            config["Paths"]["po"] = po_path
-            if "Filters" not in config:
-                config["Filters"] = {}
-            config["Filters"]["po_threshold"] = str(po_threshold)
-            with open(CONFIG_FILE, "w") as f:
-                config.write(f)
-        else:
-            sys.exit(0)
-    
-    # Load the data files using fileInput functions
-    from fileInput import xlsm_to_dataframe  # Assuming these functions exist in fileInput
-    sheet_inv = "Papier"
-    sheet_po = "PO Client"
-    inv_df = xlsm_to_dataframe(xlsm_file=inv_path, sheet_name=sheet_inv, start_row=3)
-    inv_df = filter_inv_df(inv_df, "S21-1")
-    po_df = xlsm_to_dataframe(xlsm_file=po_path, sheet_name=sheet_po, start_row=1)
-    po_df = filter_po_df(po_df, po_threshold)
-    
-    createGui(po_df, inv_df)
-
-if __name__ == "__main__":
-    main()
