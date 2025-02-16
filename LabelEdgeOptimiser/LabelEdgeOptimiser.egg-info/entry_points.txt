@@ -1,0 +1,2 @@
+[console_scripts]
+labeledge = main:main

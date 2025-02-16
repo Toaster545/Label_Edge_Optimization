@@ -1,0 +1,7 @@
+setup.py
+LabelEdgeOptimiser.egg-info/PKG-INFO
+LabelEdgeOptimiser.egg-info/SOURCES.txt
+LabelEdgeOptimiser.egg-info/dependency_links.txt
+LabelEdgeOptimiser.egg-info/entry_points.txt
+LabelEdgeOptimiser.egg-info/requires.txt
+LabelEdgeOptimiser.egg-info/top_level.txt
