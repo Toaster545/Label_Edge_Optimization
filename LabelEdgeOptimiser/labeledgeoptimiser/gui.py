@@ -4,6 +4,12 @@ from labeledgeoptimiser.solution_dialog import SolutionDialog
 from labeledgeoptimiser.solve_worker import SolveWorker
 from labeledgeoptimiser.utils import createProductBlocks
 
+# gui.py
+from PyQt5 import QtWidgets, QtCore, QtGui
+from labeledgeoptimiser.solution_dialog import SolutionDialog
+from labeledgeoptimiser.solve_worker import SolveWorker
+from labeledgeoptimiser.utils import createProductBlocks
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, po_df, inv_df):
         super().__init__()
@@ -25,7 +31,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.init_file_settings_page()
         # Base page with products, papers, tolerances etc.
         self.init_base_page()
-        # Start with the file settings page (index 0)
+        # Always start with the file settings page
         self.stacked_widget.setCurrentIndex(0)
         
         self.solve_worker = None
@@ -52,35 +58,35 @@ class MainWindow(QtWidgets.QMainWindow):
         # Inv Active Label
         inv_active_layout = QtWidgets.QVBoxLayout()
         inv_active_layout.addWidget(QtWidgets.QLabel("Inv Active Label:"))
-        self.inv_active_label_edit = QtWidgets.QLineEdit()
+        self.inv_active_label_edit = QtWidgets.QLineEdit("Actif / Inactif")
         inv_active_layout.addWidget(self.inv_active_label_edit)
         inv_data_layout.addLayout(inv_active_layout)
         
         # Inv ID Label
         inv_id_layout = QtWidgets.QVBoxLayout()
         inv_id_layout.addWidget(QtWidgets.QLabel("Inv ID Label:"))
-        self.inv_id_label_edit = QtWidgets.QLineEdit()
+        self.inv_id_label_edit = QtWidgets.QLineEdit("Roll ID")
         inv_id_layout.addWidget(self.inv_id_label_edit)
         inv_data_layout.addLayout(inv_id_layout)
         
         # Inv Paper Label
         inv_paper_layout = QtWidgets.QVBoxLayout()
         inv_paper_layout.addWidget(QtWidgets.QLabel("Inv Paper Label:"))
-        self.inv_paper_label_edit = QtWidgets.QLineEdit()
+        self.inv_paper_label_edit = QtWidgets.QLineEdit("Code LabelEdge")
         inv_paper_layout.addWidget(self.inv_paper_label_edit)
         inv_data_layout.addLayout(inv_paper_layout)
         
         # Inv Width Label
         inv_width_layout = QtWidgets.QVBoxLayout()
         inv_width_layout.addWidget(QtWidgets.QLabel("Inv Width Label:"))
-        self.inv_width_label_edit = QtWidgets.QLineEdit()
+        self.inv_width_label_edit = QtWidgets.QLineEdit("Larg.")
         inv_width_layout.addWidget(self.inv_width_label_edit)
         inv_data_layout.addLayout(inv_width_layout)
         
         # Inv Length Label
         inv_length_layout = QtWidgets.QVBoxLayout()
         inv_length_layout.addWidget(QtWidgets.QLabel("Inv Length Label:"))
-        self.inv_length_label_edit = QtWidgets.QLineEdit()
+        self.inv_length_label_edit = QtWidgets.QLineEdit("Longueur")
         inv_length_layout.addWidget(self.inv_length_label_edit)
         inv_data_layout.addLayout(inv_length_layout)
         
@@ -102,35 +108,35 @@ class MainWindow(QtWidgets.QMainWindow):
         # PO Active Label
         po_active_layout = QtWidgets.QVBoxLayout()
         po_active_layout.addWidget(QtWidgets.QLabel("PO Active Label:"))
-        self.po_active_label_edit = QtWidgets.QLineEdit()
+        self.po_active_label_edit = QtWidgets.QLineEdit("Actif / Inactif")
         po_active_layout.addWidget(self.po_active_label_edit)
         po_data_layout.addLayout(po_active_layout)
         
         # PO Number Label
         po_number_layout = QtWidgets.QVBoxLayout()
         po_number_layout.addWidget(QtWidgets.QLabel("PO Number Label:"))
-        self.po_number_label_edit = QtWidgets.QLineEdit()
+        self.po_number_label_edit = QtWidgets.QLineEdit("No")
         po_number_layout.addWidget(self.po_number_label_edit)
         po_data_layout.addLayout(po_number_layout)
         
         # PO Start Column Label
         po_start_col_layout = QtWidgets.QVBoxLayout()
         po_start_col_layout.addWidget(QtWidgets.QLabel("PO Start Column Label:"))
-        self.po_start_col_label_edit = QtWidgets.QLineEdit()
+        self.po_start_col_label_edit = QtWidgets.QLineEdit("Code Prix 1")
         po_start_col_layout.addWidget(self.po_start_col_label_edit)
         po_data_layout.addLayout(po_start_col_layout)
         
         # PO Company Label
         po_company_layout = QtWidgets.QVBoxLayout()
         po_company_layout.addWidget(QtWidgets.QLabel("PO Company Label:"))
-        self.po_company_label_edit = QtWidgets.QLineEdit()
+        self.po_company_label_edit = QtWidgets.QLineEdit("Vendu à")
         po_company_layout.addWidget(self.po_company_label_edit)
         po_data_layout.addLayout(po_company_layout)
         
         # PO Order Label
         po_order_layout = QtWidgets.QVBoxLayout()
         po_order_layout.addWidget(QtWidgets.QLabel("PO Order Label:"))
-        self.po_order_label_edit = QtWidgets.QLineEdit()
+        self.po_order_label_edit = QtWidgets.QLineEdit("No Commande")
         po_order_layout.addWidget(self.po_order_label_edit)
         po_data_layout.addLayout(po_order_layout)
         
@@ -146,7 +152,13 @@ class MainWindow(QtWidgets.QMainWindow):
         load_btn.clicked.connect(self.load_files)
         layout.addRow(load_btn)
         
-        self.load_config()
+        # Try to load config, but don't worry if it fails
+        try:
+            self.load_config()
+        except Exception as e:
+            print(f"Could not load config: {e}")
+            # Config loading failed, but we already have default values set
+            pass
         
         self.stacked_widget.addWidget(self.settings_page)
 
@@ -167,33 +179,37 @@ class MainWindow(QtWidgets.QMainWindow):
             self.po_path_edit.setText(filename)
     
     def load_config(self):
+        """Load configuration, creating default if none exists"""
         import configparser, os
         from labeledgeoptimiser.config_utils import get_config_path
+        
         self.config = configparser.ConfigParser()
         config_file = get_config_path()
         print("Loading config from:", config_file)
+        
+        # Create default config
+        self.config["Paths"] = {"inventory": "", "po": ""}
+        self.config["Filters"] = {"po_threshold": "305"}
+        self.config["Inv_data"] = {
+            "active_label": "Actif / Inactif",
+            "id_label": "Roll ID",
+            "paper_label": "Code LabelEdge",
+            "width_label": "Larg.",
+            "length_label": "Longueur"
+        }
+        self.config["Po_data"] = {
+            "active_label": "Actif / Inactif",
+            "number_label": "No",
+            "start_col_label": "Code Prix 1",
+            "company_label": "Vendu à",
+            "order_label": "No Commande"
+        }
+        
+        # If config file exists, read it to override defaults
         if os.path.exists(config_file):
             self.config.read(config_file)
-        else:
-            # Create default config if it doesn't exist
-            self.config["Paths"] = {"inventory": "", "po": ""}
-            self.config["Filters"] = {"po_threshold": "305"}
-            self.config["Inv_data"] = {
-                "active_label": "Actif / Inactif",
-                "id_label": "Roll ID",
-                "paper_label": "Code LabelEdge",
-                "width_label": "Larg.",
-                "length_label": "Longueur"
-            }
-            self.config["Po_data"] = {
-                "active_label": "Actif / Inactif",
-                "number_label": "No",
-                "start_col_label": "Code Prix 1",
-                "company_label": "Vendu à",
-                "order_label": "No Commande"
-            }
-        print("Loaded sections in load_config:", self.config.sections())
         
+        # Set values from config (using defaults if sections/keys don't exist)
         self.inv_path_edit.setText(self.config.get("Paths", "inventory", fallback=""))
         self.po_path_edit.setText(self.config.get("Paths", "po", fallback=""))
         self.po_filter_edit.setText(self.config.get("Filters", "po_threshold", fallback="305"))
