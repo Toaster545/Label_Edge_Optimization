@@ -1,4 +1,3 @@
-; -- setup.iss --
 [Setup]
 ; Basic application settings
 AppName=OptimiseApp
@@ -16,7 +15,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 ; Add all required files
 Source: "OptimiseApp.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "config.ini"; DestDir: "{app}"; Flags: ignoreversion
 Source: "styles.qss"; DestDir: "{app}"; Flags: ignoreversion
 Source: "appIcon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -29,5 +27,4 @@ Name: "{commondesktop}\OptimiseApp"; Filename: "{app}\OptimiseApp.exe"; IconFile
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Run]
-; Ensure the installer launches the correct application
 Filename: "{app}\OptimiseApp.exe"; Description: "Launch OptimiseApp"; Flags: nowait postinstall skipifsilent
