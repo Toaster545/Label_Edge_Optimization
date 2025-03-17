@@ -2,9 +2,9 @@ import sys
 import os
 import configparser
 from PyQt5 import QtWidgets
-from labeledgeoptimiser.gui import MainWindow
-from labeledgeoptimiser.fileInput import xlsm_to_dataframe, filter_inv_df, filter_po_df
-from labeledgeoptimiser.config_utils import get_config_path
+from gui import MainWindow
+from fileInput import xlsm_to_dataframe, filter_inv_df, filter_po_df
+from config_utils import get_config_path
 
 CONFIG_FILE = "config.ini"
 
@@ -43,12 +43,14 @@ def main():
             "company_label": "Vendu à",
             "order_label": "No Commande"
         }
+    if not config.has_section("Optimization"):
+        config["Optimization"] = {"algorithm": "MILP"}
+        
 
     # Create empty DataFrames as placeholders
     import pandas as pd
     inv_df = pd.DataFrame()
     po_df = pd.DataFrame()
-
     # Create and show the main window
     main_window = MainWindow(po_df, inv_df)
     main_window.show()

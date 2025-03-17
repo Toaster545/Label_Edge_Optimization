@@ -1,0 +1,6 @@
+{
+    "jupyter.themeMatplotlibPlots": true,
+    "typescript.inlayHints.enumMemberValues.enabled": true,
+    "workbench.iconTheme": "vs-seti",
+    "workbench.colorTheme": "Monokai Dimmed"
+}
