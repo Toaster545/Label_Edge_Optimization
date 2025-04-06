@@ -29,28 +29,20 @@ def print_masters_table(masters):
 
 def createProductBlocks(po_df, selected_pos):
     
-    numbers = []
-    for p in selected_pos:
-        p = p.split(' ')[0]
-        numbers.append(p)
+    numbers = [p.split(' ')[0] for p in selected_pos]
     
-    df = po_df.loc[po_df['No'].astype(str).isin(numbers)]
+    # Create a lookup dictionary for quick mapping from PO_Number to Products string.
+    lookup = {str(row['PO_Number']): row['Products'] for _, row in po_df.iterrows()}
     
-    valid_products_per_row = []
-
-    # Loop through each row
-    for index, row in df.iterrows():
-        # Get the number of valid products
-        num_products = int(row['num_products'])
-        
-        # Collect valid products
-        valid_products = []
-        for i in range(1, num_products + 1):
-            product = row[f'Product#{i}']
-            if product != 'nan/nan/nan':  # Ensure the product is valid
-                valid_products_per_row.append(product)
+    product_blocks = []
+    for num in numbers:
+        product_str = lookup.get(num, '')
+        if product_str:
+            # Split product_str by comma, trim whitespace, and filter out empty strings.
+            products = [p.strip() for p in product_str.split(',') if p.strip()]
+            product_blocks.extend(products)
     
-    return valid_products_per_row
+    return product_blocks
 
 def createMasterDict(inv_df, prod_list_length, len_tol=0.1):
     masterDict = []

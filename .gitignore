@@ -2,3 +2,16 @@ venv
 /__pycache__
 *.pyc
 __pycache__/gui.cpython-312.pyc
+LabelEdgeOptimiser/build/OptimiseApp/Analysis-00.toc
+LabelEdgeOptimiser/build/OptimiseApp/OptimiseApp.pkg
+LabelEdgeOptimiser/build/OptimiseApp/PKG-00.toc
+LabelEdgeOptimiser/build/OptimiseApp/PYZ-00.pyz
+LabelEdgeOptimiser/build/OptimiseApp/PYZ-00.toc
+LabelEdgeOptimiser/build/OptimiseApp/warn-OptimiseApp.txt
+LabelEdgeOptimiser/build/OptimiseApp/xref-OptimiseApp.html
+LabelEdgeOptimiser/config.ini
+LabelEdgeOptimiser/build/OptimiseApp/OptimiseApp.pkg
+LabelEdgeOptimiser/build/OptimiseApp/OptimiseApp.pkg
+LabelEdgeOptimiser/build/OptimiseApp/PKG-00.toc
+/LabelEdgeOptimiser/build
+LabelEdgeOptimiser/OptimiseApp.spec
