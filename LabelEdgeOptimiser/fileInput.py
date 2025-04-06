@@ -47,27 +47,73 @@ def filter_inv_df(df,
     df = df.reset_index(drop=True)
     return df
 
-def filter_po_df(df, start_row,
+
+def filter_po_df(df, 
+                 start_row,
                  actIna="A",
-                 activeLabel = 'Actif / Inactif',
-                 numberLabel = 'No',
-                 startColLabel = "Code Prix 1",
-                 companyLabel = "Vendu à",
-                 orderLabel = 'No Commande'
-                 ):
-    df = df.loc[df[activeLabel] == actIna]
-    po_df = df.loc[df[numberLabel] >= start_row]
-    po_df = po_df[po_df[companyLabel].notna()]
+                 activeLabel='Actif / Inactif',
+                 numberLabel='Notre # comm',
+                 startColLabel='Code Mat',
+                 companyLabel='Client',
+                 orderLabel='# Comm Client'):
+    """
+    Filters and groups a purchase-order-like DataFrame:
+      1. If `activeLabel` is in df columns, keep only rows where its value == actIna.
+      2. Keep only rows where `numberLabel` >= start_row (you can change to == if needed).
+      3. Group by `numberLabel`, and collapse rows that share that number into one.
+      4. In the collapsed row, combine the 'Code' and 'Qté totale' as 'Code/Qty'.
+    """
+    print(df)
+    if activeLabel in df.columns:
+        df = df[df[activeLabel] == actIna]
+
+    df = df[df[numberLabel] >= start_row]
+
+    # 3. Group by 'Notre # comm' to collapse repeated lines
+    grouped = (
+        df
+        .groupby(numberLabel, as_index=False)
+        .agg({
+            companyLabel: 'first',        # or 'unique' if you expect multiple different clients
+            orderLabel: 'first',          # same logic as above
+            startColLabel: list,          # collect all Codes
+            'Qté totale': list,           # collect all Qté totales
+            'Total msi': list           # collect all totalMSis
+        })
+    )
+
+    def combine_code_qty(row):
+        codes = row[startColLabel]
+        qtys = row['Qté totale']
+        total_msi = row['Total msi']
+        # Combine the codes and quantities as before
+        combined = ", ".join(f"{c}/{q}/{m}" for c, q, m in zip(codes, qtys, total_msi))
+        return combined
+
+    grouped['Codes_Qty'] = grouped.apply(combine_code_qty, axis=1)
+
+    # You can decide which columns to keep.  Below we keep:
+    #   Notre # comm, Client, # Comm Client, and our new combined Code/Qty column
+    final_cols = [
+        numberLabel,
+        companyLabel,
+        orderLabel,
+        'Codes_Qty'
+    ]
     
-    named_columns = [numberLabel, companyLabel, orderLabel]
-    start_index = po_df.columns.get_loc(startColLabel)
-    columns_to_keep = named_columns + list(po_df.columns[start_index:])
-    po_df = po_df[columns_to_keep]
     
-    po_df = process_groups(po_df, startColLabel)
-    po_df = po_df.reset_index(drop=True)
+    result = grouped[final_cols].copy()
+
+    result.rename(columns={
+        numberLabel: 'PO_Number',
+        companyLabel: 'Client',
+        orderLabel: 'Order_Number',
+        'Codes_Qty': 'Products'
+    }, inplace=True)
     
-    return po_df
+    print(result)
+    return result
+
     
 
 def convert_units(df):
@@ -112,6 +158,7 @@ def process_groups(df, start_column):
     Returns:
         pd.DataFrame: Processed DataFrame with the grouped 'Product#' columns and 'num_products' column.
     """
+    print("GRoups: \n", df)
     # Find the start index for processing
     start_index = df.columns.get_loc(start_column)
     
@@ -147,5 +194,7 @@ def process_groups(df, start_column):
                          and value != '//0/nan/0.0'
                          and value != '//nan/nan') for value in row), axis=1
     )
+    
+    print(processed_df)
 
     return processed_df

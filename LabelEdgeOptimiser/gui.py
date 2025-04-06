@@ -264,7 +264,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 lengthLabel=self.inv_length_label_edit.text()
             )
             self.po_df = xlsm_to_dataframe(
-                xlsm_file=self.po_path_edit.text(), sheet_name="PO Client", start_row=1
+                xlsm_file=self.po_path_edit.text(), sheet_name="PO item", start_row=1
             )
             po_threshold = int(self.po_filter_edit.text())
             self.po_df = filter_po_df(
@@ -290,9 +290,9 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def choose_orders(self):
         po_list = (
-            self.po_df['No'].astype(str) + " " +
-            self.po_df['Vendu à'].astype(str) + " " +
-            self.po_df['No Commande'].astype(str)
+            self.po_df['PO_Number'].astype(str) + " " +
+            self.po_df['Client'].astype(str) + " " +
+            self.po_df['Order_Number'].astype(str)
         ).tolist()
         dlg = OrderSelectionDialog(po_list, self.po_df, self)
         if dlg.exec_() == QtWidgets.QDialog.Accepted:
